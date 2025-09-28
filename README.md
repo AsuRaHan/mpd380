@@ -88,7 +88,7 @@ The МПД-380 uses the Modbus RTU protocol over RS485 with the following specif
    - Search for "ModbusMaster" and install.
 3. **Connect Hardware** as described above.
 4. **Upload Sketch**:
-   - Open `main.ino` in the Arduino IDE.
+   - Open `mpd380.ino` in the Arduino IDE.
    - Select your ESP32 board and port.
    - Upload the code.
 
@@ -103,7 +103,7 @@ The МПД-380 uses the Modbus RTU protocol over RS485 with the following specif
 3. **Error Handling**:
    - If an error occurs (e.g., `Ошибка Modbus: 0xE0 - Таймаут`), check wiring, power, or baud rate.
 
-## Sketch Details (`main.ino`)
+## Sketch Details (`mpd380.ino`)
 
 ### Code Structure
 - **Libraries**: Uses `ModbusMaster.h` for Modbus RTU communication.
@@ -142,5 +142,4 @@ The МПД-380 uses the Modbus RTU protocol over RS485 with the following specif
 This project is open-source. Feel free to modify and distribute under the MIT License.
 
 ## Acknowledgments
-- Thanks to the xAI community for support and inspiration.
-- Documentation based on the "Карта протокола Modbus RTU - МПД380.pdf" provided by the user.
+- Documentation based on the "Карта протокола Modbus RTU - МПД380.pdf"

@@ -6,6 +6,7 @@
 
 #include <ModbusMaster.h>
 #include <LiquidCrystal_I2C.h>
+#include <Wire.h>
 
 // Пины
 #define RX_PIN 16
@@ -17,6 +18,7 @@ ModbusMaster node;
 
 // Инициализация дисплея (адрес I2C может быть 0x27 или 0x3F, проверь с помощью I2C Scanner)
 LiquidCrystal_I2C lcd(0x27, 20, 4); // 20 символов, 4 строки, адрес 0x27 (измени, если нужно)
+bool displayConnected = false;
 
 void setup() {
   Serial.begin(115200);
@@ -26,12 +28,25 @@ void setup() {
   Serial2.begin(9600, SERIAL_8N1, RX_PIN, TX_PIN);
   node.begin(1, Serial2); // Slave адрес 1
 
-  // Инициализация дисплея
-  lcd.init();
-  lcd.backlight();
-  lcd.setCursor(0, 0);
-  lcd.print("МПД-380 Modbus");
-  delay(2000); // Пауза для отображения приветствия
+  // Инициализация I2C
+  Wire.begin(SDA_PIN, SCL_PIN);
+  
+  // Проверка подключения дисплея
+  displayConnected = checkDisplayConnection();
+  
+  if (displayConnected) {
+    // Инициализация дисплея
+    lcd.init();
+    lcd.backlight();
+    lcd.setCursor(0, 0);
+    lcd.print("МПД-380 Modbus");
+    lcd.setCursor(0, 1);
+    lcd.print("Дисплей: OK");
+    delay(2000); // Пауза для отображения приветствия
+  } else {
+    Serial.println("Дисплей не подключен! Работаем только с Serial Monitor.");
+    delay(1000);
+  }
 
   Serial.println("МПД-380 Modbus: Чтение давления");
 }
@@ -39,7 +54,9 @@ void setup() {
 void loop() {
   uint8_t result = node.readHoldingRegisters(0x0000, 13); // Читаем 0x0000–0x000C
 
-  lcd.clear(); // Очищаем дисплей перед новым выводом
+  if (displayConnected) {
+    lcd.clear(); // Очищаем дисплей перед новым выводом
+  }
 
   if (result == node.ku8MBSuccess) {
     int16_t slave_addr = node.getResponseBuffer(0);    // 0x0000
@@ -54,29 +71,31 @@ void loop() {
     String unit_str = getUnitString(units);
     String baud_str = getBaudRate(baud_code);
 
-    // Вывод на дисплей
-    lcd.setCursor(0, 0);
-    lcd.print("Addr: ");
-    lcd.print(slave_addr);
-    lcd.print("  Baud: ");
-    lcd.print(baud_str);
+    // Вывод на дисплей (если подключен)
+    if (displayConnected) {
+      lcd.setCursor(0, 0);
+      lcd.print("Addr: ");
+      lcd.print(slave_addr);
+      lcd.print("  Baud: ");
+      lcd.print(baud_str);
 
-    lcd.setCursor(0, 1);
-    lcd.print("Unit: ");
-    lcd.print(unit_str);
-    lcd.print("  P: ");
-    lcd.print(pressure_value, (decimal_places > 0) ? decimal_places : 2);
+      lcd.setCursor(0, 1);
+      lcd.print("Unit: ");
+      lcd.print(unit_str);
+      lcd.print("  P: ");
+      lcd.print(pressure_value, (decimal_places > 0) ? decimal_places : 2);
 
-    lcd.setCursor(0, 2);
-    lcd.print("Dec: ");
-    lcd.print(decimal_places);
-    lcd.print("  Off: ");
-    lcd.print(offset);
+      lcd.setCursor(0, 2);
+      lcd.print("Dec: ");
+      lcd.print(decimal_places);
+      lcd.print("  Off: ");
+      lcd.print(offset);
 
-    lcd.setCursor(0, 3);
-    lcd.print("Status: OK");
+      lcd.setCursor(0, 3);
+      lcd.print("Status: OK");
+    }
 
-    // Вывод в Serial Monitor (для отладки)
+    // Вывод в Serial Monitor (всегда)
     Serial.print("Адрес: "); Serial.println(slave_addr);
     Serial.print("Скорость: "); Serial.print(baud_str); Serial.println(" бод");
     Serial.print("Единицы: "); Serial.println(unit_str);
@@ -90,17 +109,34 @@ void loop() {
     Serial.println("---");
   } else {
     // Обработка ошибок
-    lcd.setCursor(0, 3);
-    lcd.print("Status: Err 0x");
-    lcd.print(result, HEX);
+    if (displayConnected) {
+      lcd.setCursor(0, 3);
+      lcd.print("Status: Err 0x");
+      lcd.print(result, HEX);
+    }
 
     Serial.print("Ошибка Modbus: 0x"); Serial.print(result, HEX);
     switch (result) {
-      case 0xE0: Serial.println(" - Таймаут"); lcd.print(" Timeout"); break;
-      case 0xE1: Serial.println(" - Неверный CRC"); lcd.print(" CRC Err"); break;
-      case 0xE2: Serial.println(" - Исключение Modbus"); lcd.print(" Modbus Err"); break;
-      case 0x83: Serial.println(" - Неверный адрес"); lcd.print(" Addr Err"); break;
-      default: Serial.println(" - Неизвестная ошибка"); lcd.print(" Unknown"); break;
+      case 0xE0: 
+        Serial.println(" - Таймаут"); 
+        if (displayConnected) lcd.print(" Timeout"); 
+        break;
+      case 0xE1: 
+        Serial.println(" - Неверный CRC"); 
+        if (displayConnected) lcd.print(" CRC Err"); 
+        break;
+      case 0xE2: 
+        Serial.println(" - Исключение Modbus"); 
+        if (displayConnected) lcd.print(" Modbus Err"); 
+        break;
+      case 0x83: 
+        Serial.println(" - Неверный адрес"); 
+        if (displayConnected) lcd.print(" Addr Err"); 
+        break;
+      default: 
+        Serial.println(" - Неизвестная ошибка"); 
+        if (displayConnected) lcd.print(" Unknown"); 
+        break;
     }
   }
 
@@ -137,4 +173,33 @@ String getBaudRate(uint8_t baud_code) {
     case 7: return "115200";
     default: return "unkn.";
   }
+}
+
+// Функция проверки подключения дисплея
+bool checkDisplayConnection() {
+  Serial.println("Проверка подключения дисплея...");
+  
+  // Проверяем несколько возможных адресов I2C
+  byte addresses[] = {0x27, 0x3F, 0x20, 0x38};
+  byte foundAddress = 0;
+  
+  for (byte i = 0; i < sizeof(addresses); i++) {
+    Wire.beginTransmission(addresses[i]);
+    byte error = Wire.endTransmission();
+    
+    if (error == 0) {
+      foundAddress = addresses[i];
+      Serial.print("Дисплей найден по адресу: 0x");
+      Serial.println(foundAddress, HEX);
+      
+      // Если нашли другой адрес, обновляем объект lcd
+      if (foundAddress != 0x27) {
+        lcd = LiquidCrystal_I2C(foundAddress, 20, 4);
+      }
+      return true;
+    }
+  }
+  
+  Serial.println("Дисплей не найден! Проверьте подключение.");
+  return false;
 }
